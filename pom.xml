@@ -4,7 +4,7 @@
 
   <groupId>io.github.dengchen2020</groupId>
   <artifactId>querydsl-sql-spring-annotation-apt</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <packaging>jar</packaging>
 
   <developers>
@@ -17,7 +17,7 @@
 
   <name>querydsl-sql-spring-annotation-apt</name>
   <url>https://github.com/DengChen2020/querydsl-sql-spring-annotation-apt</url>
-  <description>解析Spring注解生成querydsl-sql查询Q类</description>
+  <description>解析SpringDataJdbc注解生成querydsl-sql查询Q类</description>
 
   <distributionManagement>
     <snapshotRepository>
