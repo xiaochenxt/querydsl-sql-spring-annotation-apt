@@ -1,5 +1,7 @@
 package io.github.xiaochenxt.processor;
 
+import org.springframework.data.util.ParsingUtils;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -341,21 +343,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
      * @return 字段名
      */
     private String constantValue(String fieldName) {
-        StringBuilder result = new StringBuilder();
-        boolean isFirst = true;
-        for (int i = 0; i < fieldName.length(); i++) {
-            char currentChar = fieldName.charAt(i);
-            if (Character.isUpperCase(currentChar)) {
-                if (!isFirst) {
-                    result.append("_");
-                }
-                result.append(Character.toLowerCase(currentChar));
-            } else {
-                result.append(currentChar);
-            }
-            isFirst = false;
-        }
-        return result.toString();
+        return ParsingUtils.reconcatenateCamelCase(fieldName,"_");
     }
 
     private String getTableName(TypeElement element) {

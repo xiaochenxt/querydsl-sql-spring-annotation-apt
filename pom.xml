@@ -4,7 +4,7 @@
 
   <groupId>io.github.dengchen2020</groupId>
   <artifactId>querydsl-sql-spring-annotation-apt</artifactId>
-  <version>0.0.2</version>
+  <version>0.0.3</version>
   <packaging>jar</packaging>
 
   <developers>
@@ -52,7 +52,11 @@
   </properties>
 
   <dependencies>
-
+    <dependency>
+      <groupId>org.springframework.data</groupId>
+      <artifactId>spring-data-commons</artifactId>
+      <version>4.0.1</version>
+    </dependency>
   </dependencies>
 
   <build>
