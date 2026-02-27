@@ -141,6 +141,8 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
                         columnType = "ofType(Types.DATE).withSize(10)";
                     } else if (javaType.equals("java.time.LocalTime")) {
                         columnType = "ofType(Types.TIME).withSize(10)";
+                    } else if (javaType.equals("java.time.Instant")) {
+                        columnType = "ofType(Types.TIMESTAMP).withSize(29).withDigits(6)";
                     } else if (javaType.equals("java.sql.Timestamp")) {
                         columnType = "ofType(Types.TIMESTAMP).withSize(19)";
                     } else if (javaType.equals("java.math.BigDecimal")) {
@@ -238,6 +240,8 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
             writer.write("    public final DateTimePath<java.time.LocalDate> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalDate.class);\n\n");
         } else if (javaType.equals("java.time.LocalTime")) {
             writer.write("    public final DateTimePath<java.time.LocalTime> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalTime.class);\n\n");
+        } else if (javaType.equals("java.time.Instant")) {
+            writer.write("    public final DateTimePath<java.time.Instant> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.Instant.class);\n\n");
         } else if (javaType.equals("java.sql.Timestamp")) {
             writer.write("    public final DateTimePath<java.sql.Timestamp> " + constantName + " = createDateTime(\"" + constantName + "\", java.sql.Timestamp.class);\n\n");
         } else if (javaType.equals("java.math.BigDecimal")) {
