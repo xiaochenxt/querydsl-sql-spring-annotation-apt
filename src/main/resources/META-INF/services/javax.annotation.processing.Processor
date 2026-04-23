@@ -1,1 +1,1 @@
-io.github.xiaochenxt.processor.QuerydslSqlSpringAnnotationProcessor
+io.github.xiaochenxt.processor.QuerydslSqlJpaAnnotationProcessor

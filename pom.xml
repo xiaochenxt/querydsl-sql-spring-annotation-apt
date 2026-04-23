@@ -3,8 +3,8 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>io.github.dengchen2020</groupId>
-  <artifactId>querydsl-sql-spring-annotation-apt</artifactId>
-  <version>0.0.4</version>
+  <artifactId>querydsl-sql-jpa-annotation-apt</artifactId>
+  <version>0.0.1</version>
   <packaging>jar</packaging>
 
   <developers>
@@ -17,7 +17,7 @@
 
   <name>querydsl-sql-spring-annotation-apt</name>
   <url>https://github.com/DengChen2020/querydsl-sql-spring-annotation-apt</url>
-  <description>解析SpringDataJdbc注解生成querydsl-sql查询Q类</description>
+  <description>解析JPA注解生成querydsl-sql查询D类（与querydsl-jpa区分）</description>
 
   <distributionManagement>
     <snapshotRepository>

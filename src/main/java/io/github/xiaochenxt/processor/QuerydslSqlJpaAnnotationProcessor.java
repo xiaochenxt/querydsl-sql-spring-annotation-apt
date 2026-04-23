@@ -25,7 +25,14 @@ import java.util.stream.Collectors;
  *
  * @author xiaochen
  */
-public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
+public class QuerydslSqlJpaAnnotationProcessor extends AbstractProcessor {
+
+    private static final String TABLE = "jakarta.persistence.Table";
+    private static final String COLUMN = "jakarta.persistence.Column";
+    private static final String ID = "jakarta.persistence.Id";
+    private static final String TRANSIENT = "jakarta.persistence.Transient";
+
+    private static final String GENERATE_CLASS_PREFIX = "D";
 
     private Map<String, String> options;
 
@@ -41,7 +48,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
     @Override
     public Set<String> getSupportedAnnotationTypes() {
         Set<String> annotations = new HashSet<>();
-        annotations.add("org.springframework.data.relational.core.mapping.Table");
+        annotations.add(TABLE);
         return annotations;
     }
 
@@ -55,6 +62,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        if (processingEnv.getElementUtils().getTypeElement("com.querydsl.sql.RelationalPathBase") == null) return false;
         Set<Element> elements = new HashSet<>();
         for (TypeElement annotation : annotations) {
             elements.addAll(roundEnv.getElementsAnnotatedWith(annotation));
@@ -74,7 +82,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
     private void generateFieldConstants(TypeElement typeElement) {
         String packageName = processingEnv.getElementUtils().getPackageOf(typeElement).getQualifiedName().toString();
         String className = typeElement.getSimpleName().toString();
-        String qClassName = "Q" + typeElement.getSimpleName();
+        String qClassName = GENERATE_CLASS_PREFIX + typeElement.getSimpleName();
         try {
             Filer filer = processingEnv.getFiler();
             JavaFileObject sourceFile = filer.createSourceFile(packageName + "." + qClassName);
@@ -87,10 +95,10 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
                         "import com.querydsl.core.types.Path;\n" +
                         "import com.querydsl.sql.ColumnMetadata;\n" +
                         "import java.sql.Types;\n\n");
-                writer.write("/**\n * 根据" + typeElement.getQualifiedName().toString() + "自动生成\n * @author 小郴\n * @since " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()) + "\n */\n");
+                writer.write("/**\n * 根据" + typeElement.getQualifiedName() + "自动生成\n * @author 小郴\n * @since " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()) + "\n */\n");
                 writer.write("@Generated(value =\"" + this.getClass().getName() + "\", date =\"" +
                         new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()) +
-                        "\", comments =\"根据" + typeElement.getQualifiedName().toString() + "自动生成\")\n");
+                        "\", comments =\"根据" + typeElement.getQualifiedName() + "自动生成\")\n");
                 writer.write("public class " + qClassName + " extends com.querydsl.sql.RelationalPathBase<" + qClassName + "> {\n\n");
                 // 生成字段常量
                 String table = getTableName(typeElement);
@@ -117,52 +125,69 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
                     boolean nullable = columnInfo.isNullable();
                     String javaType = columnInfo.getJavaType();
                     String columnType;
-                    if (javaType.equals("java.lang.String")) {
-                        if (columnInfo.isJson()) {
-                            columnType = "ofType(Types.VARCHAR).withSize(" + Integer.MAX_VALUE + ")";
-                        }else {
-                            columnType = "ofType(Types.VARCHAR).withSize(" + columnInfo.getLength() + ")";
-                        }
-                    } else if (javaType.equals("java.lang.Integer")) {
-                        if (columnInfo.getColumnDefinition().contains("tinyint")) {
-                            columnType = "ofType(Types.TINYINT).withSize(3)";
-                        } else if (columnInfo.getColumnDefinition().contains("smallint")) {
-                            columnType = "ofType(Types.SMALLINT).withSize(3)";
-                        } else {
-                            columnType = "ofType(Types.INTEGER).withSize(10)";
-                        }
-                    } else if (javaType.equals("java.lang.Long")) {
-                        columnType = "ofType(Types.BIGINT).withSize(19)";
-                    } else if (javaType.equals("java.util.Date")) {
-                        columnType = "ofType(Types.TIMESTAMP).withSize(19)";
-                    } else if (javaType.equals("java.time.LocalDateTime")) {
-                        columnType = "ofType(Types.TIMESTAMP).withSize(29).withDigits(6)";
-                    } else if (javaType.equals("java.time.LocalDate")) {
-                        columnType = "ofType(Types.DATE).withSize(10)";
-                    } else if (javaType.equals("java.time.LocalTime")) {
-                        columnType = "ofType(Types.TIME).withSize(10)";
-                    } else if (javaType.equals("java.time.Instant")) {
-                        columnType = "ofType(Types.TIMESTAMP).withSize(29).withDigits(6)";
-                    } else if (javaType.equals("java.sql.Timestamp")) {
-                        columnType = "ofType(Types.TIMESTAMP).withSize(19)";
-                    } else if (javaType.equals("java.math.BigDecimal")) {
-                        columnType = "ofType(Types.NUMERIC).withSize(" + columnInfo.getPrecision() + ").withDigits(" + columnInfo.getScale() + ")";
-                    } else if (javaType.equals("java.lang.Float")) {
-                        columnType = "ofType(Types.FLOAT).withSize(5)";
-                    } else if (javaType.equals("java.lang.Double")) {
-                        columnType = "ofType(Types.DOUBLE).withSize(5)";
-                    } else if (javaType.equals("java.lang.Byte")) {
-                        columnType = "ofType(Types.CHAR).withSize(1)";
-                    } else if (javaType.equals("java.lang.Short")) {
-                        columnType = "ofType(Types.NUMERIC).withSize(5)";
-                    } else if (javaType.equals("java.lang.Boolean")) {
-                        columnType = "ofType(Types.BIT).withSize(1)";
-                    } else {
-                        if (columnInfo.isJson()) {
-                            columnType = "ofType(Types.OTHER).withSize("+ Integer.MAX_VALUE +")";
-                        } else {
-                            columnType = "ofType(Types.VARCHAR).withSize("+ columnInfo.getLength() +")";
-                        }
+                    switch (javaType) {
+                        case "java.lang.String":
+                            if (columnInfo.isJson()) {
+                                columnType = "ofType(Types.VARCHAR).withSize(" + Integer.MAX_VALUE + ")";
+                            } else {
+                                columnType = "ofType(Types.VARCHAR).withSize(" + columnInfo.getLength() + ")";
+                            }
+                            break;
+                        case "java.lang.Integer":
+                            if (columnInfo.getColumnDefinition().contains("tinyint")) {
+                                columnType = "ofType(Types.TINYINT).withSize(3)";
+                            } else if (columnInfo.getColumnDefinition().contains("smallint")) {
+                                columnType = "ofType(Types.SMALLINT).withSize(3)";
+                            } else {
+                                columnType = "ofType(Types.INTEGER).withSize(10)";
+                            }
+                            break;
+                        case "java.lang.Long":
+                            columnType = "ofType(Types.BIGINT).withSize(19)";
+                            break;
+                        case "java.util.Date":
+                            columnType = "ofType(Types.TIMESTAMP).withSize(19)";
+                            break;
+                        case "java.time.LocalDateTime":
+                            columnType = "ofType(Types.TIMESTAMP).withSize(29).withDigits(6)";
+                            break;
+                        case "java.time.LocalDate":
+                            columnType = "ofType(Types.DATE).withSize(10)";
+                            break;
+                        case "java.time.LocalTime":
+                            columnType = "ofType(Types.TIME).withSize(10)";
+                            break;
+                        case "java.time.Instant":
+                            columnType = "ofType(Types.TIMESTAMP).withSize(29).withDigits(6)";
+                            break;
+                        case "java.sql.Timestamp":
+                            columnType = "ofType(Types.TIMESTAMP).withSize(19)";
+                            break;
+                        case "java.math.BigDecimal":
+                            columnType = "ofType(Types.NUMERIC).withSize(" + columnInfo.getPrecision() + ").withDigits(" + columnInfo.getScale() + ")";
+                            break;
+                        case "java.lang.Float":
+                            columnType = "ofType(Types.FLOAT).withSize(5)";
+                            break;
+                        case "java.lang.Double":
+                            columnType = "ofType(Types.DOUBLE).withSize(5)";
+                            break;
+                        case "java.lang.Byte":
+                            columnType = "ofType(Types.CHAR).withSize(1)";
+                            break;
+                        case "java.lang.Short":
+                            columnType = "ofType(Types.NUMERIC).withSize(5)";
+                            break;
+                        case "java.lang.Boolean":
+                            columnType = "ofType(Types.BIT).withSize(1)";
+                            break;
+                        default:
+                            if (columnInfo.isJson()) {
+                                columnType = "ofType(Types.OTHER).withSize(" + Integer.MAX_VALUE + ")";
+                            } else {
+                                columnType = "ofType(Types.VARCHAR).withSize(" + columnInfo.getLength() + ")";
+                            }
+                            break;
                     }
                     if (!nullable) columnType += ".notNull()";
                     int index = i + 1;
@@ -207,7 +232,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
                         columnInfo.setJavaField(constantName);
                         columns.add(columnInfo);
                         writerColumn(enclosedElement,writer,javaType,constantName,columnInfo);
-                        if (hasAnnotation(enclosedElement, "org.springframework.data.annotation.Id")) {
+                        if (hasAnnotation(enclosedElement, ID)) {
                             writer.write("    " + "/**\n     *" + " 数据库主键\n" + "     */\n");
                             writer.write("    public final com.querydsl.sql.PrimaryKey<" + qClassName + "> primaryKey = createPrimaryKey(" + constantName + ");\n\n");
                         }
@@ -224,42 +249,59 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
         }
         columnInfo.setNullable(getColumnNullable(enclosedElement));
         columnInfo.setJson(isJson(enclosedElement));
-        if (javaType.equals("java.lang.String")) {
-            writer.write("    public final StringPath " + constantName + " = createString(\"" + constantName + "\");\n\n");
-            columnInfo.setLength(getColumnLength(enclosedElement));
-        } else if (javaType.equals("java.lang.Integer")) {
-            writer.write("    public final NumberPath<Integer> " + constantName + " = createNumber(\"" + constantName + "\", Integer.class);\n\n");
-            columnInfo.setColumnDefinition(getColumnColumnDefinition(enclosedElement));
-        } else if (javaType.equals("java.lang.Long")) {
-            writer.write("    public final NumberPath<Long> " + constantName + " = createNumber(\"" + constantName + "\", Long.class);\n\n");
-        } else if (javaType.equals("java.util.Date")) {
-            writer.write("    public final DateTimePath<java.util.Date> " + constantName + " = createDateTime(\"" + constantName + "\", java.util.Date.class);\n\n");
-        } else if (javaType.equals("java.time.LocalDateTime")) {
-            writer.write("    public final DateTimePath<java.time.LocalDateTime> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalDateTime.class);\n\n");
-        } else if (javaType.equals("java.time.LocalDate")) {
-            writer.write("    public final DateTimePath<java.time.LocalDate> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalDate.class);\n\n");
-        } else if (javaType.equals("java.time.LocalTime")) {
-            writer.write("    public final DateTimePath<java.time.LocalTime> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalTime.class);\n\n");
-        } else if (javaType.equals("java.time.Instant")) {
-            writer.write("    public final DateTimePath<java.time.Instant> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.Instant.class);\n\n");
-        } else if (javaType.equals("java.sql.Timestamp")) {
-            writer.write("    public final DateTimePath<java.sql.Timestamp> " + constantName + " = createDateTime(\"" + constantName + "\", java.sql.Timestamp.class);\n\n");
-        } else if (javaType.equals("java.math.BigDecimal")) {
-            writer.write("    public final NumberPath<java.math.BigDecimal> " + constantName + " = createNumber(\"" + constantName + "\", java.math.BigDecimal.class);\n\n");
-            columnInfo.setPrecision(getColumnPrecision(enclosedElement));
-            columnInfo.setScale(getColumnScale(enclosedElement));
-        } else if (javaType.equals("java.lang.Float")) {
-            writer.write("    public final NumberPath<Float> " + constantName + " = createNumber(\"" + constantName + "\", Float.class);\n\n");
-        } else if (javaType.equals("java.lang.Double")) {
-            writer.write("    public final NumberPath<Double> " + constantName + " = createNumber(\"" + constantName + "\", Double.class);\n\n");
-        } else if (javaType.equals("java.lang.Byte")) {
-            writer.write("    public final NumberPath<Byte> " + constantName + " = createNumber(\"" + constantName + "\", Byte.class);\n\n");
-        } else if (javaType.equals("java.lang.Short")) {
-            writer.write("    public final NumberPath<Short> " + constantName + " = createNumber(\"" + constantName + "\", Short.class);\n\n");
-        } else if (javaType.equals("java.lang.Boolean")) {
-            writer.write("    public final BooleanPath " + constantName + " = createBoolean(\"" + constantName + "\");\n\n");
-        } else {
-            writer.write("    public final SimplePath<" + javaType + "> " + constantName + " = createSimple(\"" + constantName + "\", " + javaType + ".class);\n\n");
+        switch (javaType) {
+            case "java.lang.String":
+                writer.write("    public final StringPath " + constantName + " = createString(\"" + constantName + "\");\n\n");
+                columnInfo.setLength(getColumnLength(enclosedElement));
+                break;
+            case "java.lang.Integer":
+                writer.write("    public final NumberPath<Integer> " + constantName + " = createNumber(\"" + constantName + "\", Integer.class);\n\n");
+                columnInfo.setColumnDefinition(getColumnColumnDefinition(enclosedElement));
+                break;
+            case "java.lang.Long":
+                writer.write("    public final NumberPath<Long> " + constantName + " = createNumber(\"" + constantName + "\", Long.class);\n\n");
+                break;
+            case "java.util.Date":
+                writer.write("    public final DateTimePath<java.util.Date> " + constantName + " = createDateTime(\"" + constantName + "\", java.util.Date.class);\n\n");
+                break;
+            case "java.time.LocalDateTime":
+                writer.write("    public final DateTimePath<java.time.LocalDateTime> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalDateTime.class);\n\n");
+                break;
+            case "java.time.LocalDate":
+                writer.write("    public final DateTimePath<java.time.LocalDate> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalDate.class);\n\n");
+                break;
+            case "java.time.LocalTime":
+                writer.write("    public final DateTimePath<java.time.LocalTime> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.LocalTime.class);\n\n");
+                break;
+            case "java.time.Instant":
+                writer.write("    public final DateTimePath<java.time.Instant> " + constantName + " = createDateTime(\"" + constantName + "\", java.time.Instant.class);\n\n");
+                break;
+            case "java.sql.Timestamp":
+                writer.write("    public final DateTimePath<java.sql.Timestamp> " + constantName + " = createDateTime(\"" + constantName + "\", java.sql.Timestamp.class);\n\n");
+                break;
+            case "java.math.BigDecimal":
+                writer.write("    public final NumberPath<java.math.BigDecimal> " + constantName + " = createNumber(\"" + constantName + "\", java.math.BigDecimal.class);\n\n");
+                columnInfo.setPrecision(getColumnPrecision(enclosedElement));
+                columnInfo.setScale(getColumnScale(enclosedElement));
+                break;
+            case "java.lang.Float":
+                writer.write("    public final NumberPath<Float> " + constantName + " = createNumber(\"" + constantName + "\", Float.class);\n\n");
+                break;
+            case "java.lang.Double":
+                writer.write("    public final NumberPath<Double> " + constantName + " = createNumber(\"" + constantName + "\", Double.class);\n\n");
+                break;
+            case "java.lang.Byte":
+                writer.write("    public final NumberPath<Byte> " + constantName + " = createNumber(\"" + constantName + "\", Byte.class);\n\n");
+                break;
+            case "java.lang.Short":
+                writer.write("    public final NumberPath<Short> " + constantName + " = createNumber(\"" + constantName + "\", Short.class);\n\n");
+                break;
+            case "java.lang.Boolean":
+                writer.write("    public final BooleanPath " + constantName + " = createBoolean(\"" + constantName + "\");\n\n");
+                break;
+            default:
+                writer.write("    public final SimplePath<" + javaType + "> " + constantName + " = createSimple(\"" + constantName + "\", " + removeGenerics(javaType) + ".class);\n\n");
+                break;
         }
     }
 
@@ -279,12 +321,17 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
      * @return 字段名
      */
     private Optional<String> getColumnValue(Element fieldElement) {
-        Optional<? extends AnnotationMirror> annotationMirrorOptional = getAnnotationMirror(fieldElement, "org.springframework.data.relational.core.mapping.Column");
+        Optional<? extends AnnotationMirror> annotationMirrorOptional = getAnnotationMirror(fieldElement, COLUMN);
         if (annotationMirrorOptional.isPresent()) {
             Map<? extends ExecutableElement, ? extends AnnotationValue> elementValues = annotationMirrorOptional.get().getElementValues();
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry : elementValues.entrySet()) {
                 String key = entry.getKey().getSimpleName().toString();
                 if ("value".equals(key)) {
+                    String value = entry.getValue().getValue().toString();
+                    if (!value.isEmpty()) {
+                        return Optional.of(value);
+                    }
+                } else if ("name".equals(key)) {
                     String value = entry.getValue().getValue().toString();
                     if (!value.isEmpty()) {
                         return Optional.of(value);
@@ -351,7 +398,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
     }
 
     private String getTableName(TypeElement element) {
-        Optional<? extends AnnotationMirror> annotationMirrorOptional = getAnnotationMirror(element, "org.springframework.data.relational.core.mapping.Table");
+        Optional<? extends AnnotationMirror> annotationMirrorOptional = getAnnotationMirror(element, TABLE);
         if (annotationMirrorOptional.isPresent()) {
             Map<? extends ExecutableElement, ? extends AnnotationValue> elementValues = annotationMirrorOptional.get().getElementValues();
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry : elementValues.entrySet()) {
@@ -367,7 +414,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
     }
 
     private String getTableSchema(TypeElement element) {
-        Optional<? extends AnnotationMirror> annotationMirrorOptional = getAnnotationMirror(element, "org.springframework.data.relational.core.mapping.Table");
+        Optional<? extends AnnotationMirror> annotationMirrorOptional = getAnnotationMirror(element, TABLE);
         if (annotationMirrorOptional.isPresent()) {
             Map<? extends ExecutableElement, ? extends AnnotationValue> elementValues = annotationMirrorOptional.get().getElementValues();
             for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry : elementValues.entrySet()) {
@@ -410,7 +457,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
     private boolean shouldBeIgnored(Element fieldElement) {
         return fieldElement.getModifiers().contains(Modifier.STATIC) ||
                 fieldElement.getModifiers().contains(Modifier.FINAL) ||
-                hasAnnotation(fieldElement, "org.springframework.data.annotation.Transient");
+                hasAnnotation(fieldElement, TRANSIENT);
     }
 
     /**
@@ -437,6 +484,17 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
         return elementUtils.getDocComment(element);
     }
 
+    /**
+     * 移除泛型
+     * @param javaType 例如 java.util.List<java.lang.String>
+     * @return 例如 java.util.List
+     */
+    private String removeGenerics(String javaType) {
+        int index = javaType.indexOf('<');
+        if (index != -1) javaType = javaType.substring(0, index);
+        return javaType;
+    }
+
     public static class ColumnInfo {
 
         /**
@@ -457,7 +515,7 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
         /**
          * 字段长度
          */
-        private Integer length;
+        private int length;
 
         private boolean nullable;
 
@@ -496,11 +554,11 @@ public class QuerydslSqlSpringAnnotationProcessor extends AbstractProcessor {
             this.column = column;
         }
 
-        public Integer getLength() {
+        public int getLength() {
             return length;
         }
 
-        public void setLength(Integer length) {
+        public void setLength(int length) {
             this.length = length;
         }
 
